@@ -1,21 +1,30 @@
 'use strict';
 
-const { graphql, buildSchema } = require(`graphql`);
+const { buildSchema } = require(`graphql`);
+const express = require('express');
+const { graphqlHTTP } = require('express-graphql');
+const { readFileSync } = require('fs');
+const resolvers = require('./lib/resolvers');
+
+const app = express();
 
 // define schema
-const schema = buildSchema(`
-  type Query {
-    hello: String
-  }
-`);
+const schema = buildSchema(
+  readFileSync(`${__dirname}/lib/schema.graphql`, 'utf-8')
+);
 
-// Exe query
+// middleware graphql
+app.use(
+  '/__graphql',
+  graphqlHTTP({
+    schema,
+    rootValue: resolvers,
+    graphiql: true,
+  })
+);
 
-graphql(
-  schema,
-  `
-    {
-      hello
-    }
-  `
-).then(data => console.log(data));
+const port = process.env.port || 3000;
+
+app.listen(port, () =>
+  console.log(`Server live at http://localhost:${port}/__graphql`)
+);

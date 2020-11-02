@@ -202,3 +202,69 @@ module.exports = {
 ```
 
 Aca vamos a pasar los datos que creamos que siguen la estructura que pusimos en el schema, y los vamos a retornar con el nuevo query que creamos. Al salvar, nuestro api esta actualizado con la documentacion adecuada.
+
+## Argumentos y graphql-tools
+
+Instalamos un paquete que se llama **graphql-tools** con el cual vamos a reemplazar **buildSchema** en nuestro index:
+
+```javascript
+const { makeExecutableSchema } = require(`graphql-tools`);
+
+// define schema
+const typeDefs = readFileSync(`${__dirname}/lib/schema.graphql`, 'utf-8');
+
+const schema = makeExecutableSchema({ typeDefs, resolvers });
+```
+
+Con esta configuracion nos conectamos con la nueva herramienta. Para usar esta herramienta tambien tenemos que cambiar como estamos escribiendo nuestros **resolvers**:
+
+```javascript
+module.exports = {
+  Query: {
+    getCourses: () => courses,
+  },
+};
+```
+
+Ahora necesitamos meter nuestro resolver dentro de la propiedad Query de nuestro codigo de resolvers.
+
+**Note:** La verdad el instructor no fue muy claro sobre el uso de este paquete ni para que funciona y hasta el momento solo parece mas pasos para lograr lo mismo. Entre a los docs del paquete y no hay nada claro, pero parece que es bueno para poder separar esquemas y resolvers para combinar despues.
+
+### Query por id
+
+Creamos un nuevo query en nuestro Schema que se va a llamar **getCourse** para obtener un curso nada mas usando el id para detectarlo:
+
+```graphql
+type Course {
+  _id: ID!
+  title: String!
+  teacher: String
+  description: String!
+  topic: String
+}
+
+type Query {
+  "Returns all Courses"
+  getCourses: [Course]
+  "Return specific course"
+  getCourse(_id: ID!): Course
+}
+```
+
+Aca nombramos el argumento **\_id** para que este en linea con lo que estamos usando de ID que va a ser igual usando mongo. Tambien agregamos el **!** para decir que los campos son obligatorios en nuestro API y en el caso del schema, que esos valores son obligatorios.
+
+### Resolver
+
+En nuestro resolver creamos la logica para manejar estos nuevos queries:
+
+```javascript
+module.exports = {
+  Query: {
+    getCourses: () => courses,
+    getCourse: (root, args) =>
+      courses.filter(course => course._id === args._id)[0],
+  },
+};
+```
+
+Como para este query estamos usando un argumento, tenemos que usar los parametros de la funcion de nuestro resolver, que son estandar. Root no lo vamos a usar, pero args si para sacar el **\_id** que vamos a usar en nuestro query. Con este valor usamos filter y devolvemos el valor. _Esto se puede hacer con find tambien, pero la costumbre lo hace dificil._

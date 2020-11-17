@@ -1,5 +1,6 @@
 'use strict';
 
+require('dotenv').config();
 const { makeExecutableSchema } = require(`graphql-tools`);
 const express = require('express');
 const { graphqlHTTP } = require('express-graphql');
@@ -15,7 +16,7 @@ const schema = makeExecutableSchema({ typeDefs, resolvers });
 
 // middleware graphql
 app.use(
-  '/__graphql',
+  '/graphql',
   graphqlHTTP({
     schema,
     rootValue: resolvers,
@@ -26,5 +27,5 @@ app.use(
 const port = process.env.port || 3000;
 
 app.listen(port, () =>
-  console.log(`Server live at http://localhost:${port}/__graphql`)
+  console.log(`Server live at http://localhost:${port}/graphql`)
 );

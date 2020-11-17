@@ -268,3 +268,76 @@ module.exports = {
 ```
 
 Como para este query estamos usando un argumento, tenemos que usar los parametros de la funcion de nuestro resolver, que son estandar. Root no lo vamos a usar, pero args si para sacar el **\_id** que vamos a usar en nuestro query. Con este valor usamos filter y devolvemos el valor. _Esto se puede hacer con find tambien, pero la costumbre lo hace dificil._
+
+## Mongo DB
+
+En el curso se usa mlab que ya no existe. Cree un proyecto nuevo en mongo atlas que voy a utilizar en el proyecto. El proceso va a ser un poco distinto a lo que estoy acostumbrado porque no vamos a usar mongoose, sino que vamos a estar manipulando los datos directamente. Usan una herramienta que se llama robot3t, pero atlas permite trabajar directamente sobre la base de datos.
+
+Instalamos dotenv para tener nuestra coneccion y clave segura. Despues creamos un archivo para manejar la conexion y exportamos la funcion. Esta funcion es un poco chistosa por lo antigua que se siente. Estaba tentado a hacer el resto del curso usando mongoose, pero me sirve hacer las cosas de una manera distinta de vez en cuando.
+
+```javascript
+'use strict';
+
+const { MongoClient } = require('mongodb');
+
+let connection;
+
+const connectDB = async () => {
+  if (connection) return connection;
+
+  try {
+    const client = await MongoClient.connect(process.env.MONGODB_URI, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+    });
+    connection = client.db(process.env.DB_NAME);
+    return connection;
+  } catch (err) {
+    console.log(`Could not connect to db: ${err}`);
+    process.exit(1);
+  }
+};
+
+module.exports = connectDB;
+```
+
+## Integrando la Base de Datos
+
+Como no tenemos una base de datos ni un API para insertar informacion, vamos a hacerlo manualmente. En el curso lo hacen con un cliente que se llama Robo3T, pero lo voy a manejar directamente en mongoDB Atlas. Insertamos los datos que estabamos usando en **Resolvers** en nuestra DB y los borramos de nuestro servidor. Como los vamos a insertar, borramos el \_id porque mongo lo genera automaticamente.
+
+```javascript
+// resolvers.js
+const connectDB = require('./db');
+
+...
+getCourses: async () => {
+  try {
+    db = await connectDB();
+    const courses = await db.collection('courses').find().toArray();
+    return courses;
+  } catch (err) {
+    console.log(`Error in getCourses ${err}`);
+  }
+},
+```
+
+En este resolver nos estamos conectando a la base de datos con la funcion que escribimos en la otra parte y estamos retornando el valer de los cursos en nuestra funcion asincrona. Al hacer esto, cuando corremos el query en nuestro playground, obtenemos los resultados como esperamos conseguirlos.
+
+Ahora vamos a seguir con el siguiente query, **getCourse**:
+
+```javascript
+const connectDB = require('./db');
+const { ObjectID } = require('mongodb');
+
+getCourse: async (root, { id }) => {
+  try {
+    const db = await connectDB();
+    const course = db.collection('courses').findOne({ _id: ObjectID(id) });
+    return course;
+  } catch (err) {
+    console.log(`Error in getCourse ${err}`);
+  }
+},
+```
+
+En este query estamos buscando un curso por el id. Lo importante para tener en cuenta es que el nombre del argumento que **GraphiQL** espera depende del nombre que le dimos en nuestro **schema.graphql** por lo cual hay que estar pendientes. Asi mismo, estamos _destructurando_ id de el segundo arg, pero este se llama **args** y contiene todos los argumentos que toma nuestro query segun el schema que estamos usando. Tambien estamos usando la funcion **ObjectID** que convierte un string en un id de mongo para que se pueda usar para hacer un match en la busqueda.

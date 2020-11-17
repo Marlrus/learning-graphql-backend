@@ -10,5 +10,5 @@ type Query {
   "Returns all Courses"
   getCourses: [Course]
   "Return specific course"
-  getCourse(_id: ID!): Course
+  getCourse(id: ID!): Course
 }

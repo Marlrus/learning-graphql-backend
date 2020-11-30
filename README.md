@@ -341,3 +341,108 @@ getCourse: async (root, { id }) => {
 ```
 
 En este query estamos buscando un curso por el id. Lo importante para tener en cuenta es que el nombre del argumento que **GraphiQL** espera depende del nombre que le dimos en nuestro **schema.graphql** por lo cual hay que estar pendientes. Asi mismo, estamos _destructurando_ id de el segundo arg, pero este se llama **args** y contiene todos los argumentos que toma nuestro query segun el schema que estamos usando. Tambien estamos usando la funcion **ObjectID** que convierte un string en un id de mongo para que se pueda usar para hacer un match en la busqueda.
+
+## Mutations e Inputs
+
+Es la forma de transformar info usando un API de GraphQL. Para esto creamos en nuestro **schema** una mutacion usando _type Mutation_ que va a tener un nombre, toma un input con un tipo, y retorna un Course:
+
+```graphql
+input CourseInput {
+  title: String!
+  teacher: String
+  description: String!
+  topic: String
+}
+
+type Mutation {
+  "Crea un Curso"
+  createCourse(input: CourseInput!): Course
+}
+```
+
+### Mutation en el Resolver
+
+Para no tener todo en el mismo archivo, vamos a crear un archivo nuevo **mutations.js**. En este archivo necesitamos tambien la coneccion a la base de datos, por lo cual vamos a importar **connectDB**. Decidi hacer un poquito separada mi logica a diferencia de lo que estaba en el curso. Tambien cambie la logica para no usar _object.assign_. Como una nota interesante, en el cliente de mongo que estamos usando, al terminar un insert, vamos a recibir el nuevo \_id que crea mongo en la prop **insertedId**, lo que vamos a usar para retornar el nuevo curso como esta en la base de datos cuando terminemos la mutacion:
+
+```javascript
+const connectDB = require('./db');
+
+const createCourse = async (_, { input }) => {
+  try {
+    const db = await connectDB();
+    const defaults = { teacher: '', topic: '' };
+    const newCourse = { ...defaults, ...input };
+    const course = await db.collection('courses').insertOne(newCourse);
+    const createdCourse = { ...newCourse, _id: course.insertedId };
+    return createdCourse;
+  } catch (err) {
+    console.log(`Err on createCourse: ${err.message}`);
+  }
+};
+
+module.exports = {
+  createCourse,
+};
+```
+
+Aca nos conectamos a la base de datos, creamos unos defaults para los valores opcionales, despues agregamos el del input que sobre escribe los defaults si existen, y luego insertamos eso en la base de datos. Cuando terminamos retornamos el curso que enviamos al input con el \_id creado por mongo.
+
+```graphql
+mutation {
+  createCourse(
+    input: {
+      title: "Walrus Music"
+      description: "Music for and by Walruses"
+      topic: "Music"
+      teacher: "SM Oerse"
+    }
+  ) {
+    _id
+    title
+    teacher
+    description
+    topic
+  }
+}
+```
+
+En graphiql corremos esta mutacion, vamos a insertar ese curso y como lo retornamos, vamos a ver que nos retorne el curso completo. En este punto nos fallo la mutacion **porque no incluimos la mutacion en el resolver!** Aprovechando este cambio, vamos a refactor separando los archivos para tener mas claridad. Yo tome un camino un poco distinto al curso para lograr esto.
+
+Movi los queries a su propio archivo, e hice el mismo proceso de definir los queries como funciones independientes y luego exportarlas. De la misma forma, las importo en los resolvers por aparte y las agrego a su objeto respectivo para ser mas declarativo y poder saber que queries y mutaciones podemos acceder:
+
+```javascript
+const { getCourse, getCourses } = require('./queries');
+const { createCourse } = require('./mutations');
+
+const Query = {
+  getCourse,
+  getCourses,
+};
+
+const Mutation = {
+  createCourse,
+};
+
+const Resolver = {
+  Query,
+  Mutation,
+};
+
+module.exports = Resolver;
+```
+
+Ahora al correr la mutacion tengo el resultado esperado y puedo retornar el curso. Como nota, al instructor se le olvido colocar un _await_ y le fallo es query porque estaba haciendo cambios en una promesa.
+
+## Proceso general para crear Queries y Mutations
+
+- Crear Schema de Query/Mutacion en **schema.graphql**.
+  - Crear types o inputs con sistema de tipo de graphQl.
+- Declarar Query/Mutacion en su archivo js respectivo.
+  - Conectar a db
+  - Query/Mutar usando el cliente de tu db
+  - Retornar el resultado respectivo
+  - Exportar los queries/mutaciones
+- Agregar al Resolver
+  - importar queries/mutaciones
+  - Agregarlas a su objeto respectivo de acuerda a tu schema: Query/Mutation
+  - Exportar el resolver

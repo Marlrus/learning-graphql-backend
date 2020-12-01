@@ -446,3 +446,63 @@ Ahora al correr la mutacion tengo el resultado esperado y puedo retornar el curs
   - importar queries/mutaciones
   - Agregarlas a su objeto respectivo de acuerda a tu schema: Query/Mutation
   - Exportar el resolver
+
+## Repaso
+
+Vamos a agrerag Student a nuestros queries y mutaciones. Creamos los queries, la mutacion, y el input para estudiantes. Lo que vamos a hacer de nuevo, es crear la mutacion para **edit**, que toma un tipo de input distinto porque no tiene campos obligatorios:
+
+```graphql
+input CourseEditInput {
+  title: String
+  teacher: String
+  description: String
+  topic: String
+}
+
+input StudentEditInput {
+  name: String
+  email: String
+}
+
+type Mutation {
+  "Create a Course"
+  createCourse(input: CourseInput!): Course
+  "Edit a Course"
+  editCourse(_id: ID!, input: CourseEditInput!): Course
+  "Create a Student"
+  createStudent(input: StudentInput!): Student
+  "Edit a Student"
+  editStudent(_id: ID!, input: StudentEditInput!): Student
+}
+```
+
+### Queries y Mutaciones Student
+
+Cuando terminamos esto nos vamos a los resolvers, iniciando por los queries. Esta parte me adelante copiando y modificando los queries. En la mutacion de **createStudent** lo unico que cambia es que no hay que tener _defaults_ porque todos los campos de el dato son obligatorios para Student.
+
+### Query de edit
+
+Como vamos a estar haciendo ediciones tenemos que cambiar lo que estamos usando de mongo. Vamos a pedir el id como el argumento para buscar el item en la base de datos, y usar el input para modificar el item. Esto lo hacemos con el metodo **updateOne**:
+
+```javascript
+const editCourse = async (_, { _id, input }) => {
+  try {
+    const db = await connectDB();
+    await db
+      .collection('courses')
+      .updateOne({ _id: ObjectID(_id) }, { $set: input });
+    const course = await db
+      .collection('courses')
+      .findOne({ _id: ObjectID(_id) });
+    return course;
+  } catch (err) {
+    console.log(`Err on editCourse: ${err.message}`);
+  }
+};
+```
+
+En este caso, no tenemos todos los datos del item, por lo cual tenemos que hacer un query usando **findOne** para retornar el curso editado. Para estudiante la mutacion es igual, solo tenemos que cambiar course por student en la funcion. Como un punto a favor de la forma en la que se esta haciendo en el curso, _cuando el instructor crea un query o una mutacion, no tiene que cambiar nada en el resolver_ lo cual puedo considerar hacer en el futuro.
+
+Probe la mutacion **createStudent** y funciono de entrada y retorno lo que esperabamos. Probando **getStudents** y **getStudent** obtuve los resultados esperados tambien. Probando las mutaciones, habia accidentalmente usado **editOne** en lugar de **updateOne** lo que estaba haciendo que fallara la mutacion porque no existia dentro de mongo.
+
+Reto, mutaciones de delete.

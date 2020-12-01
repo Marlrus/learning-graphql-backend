@@ -56,12 +56,12 @@ type Mutation {
   createCourse(input: CourseInput!): Course
   "Edit a Course"
   editCourse(_id: ID!, input: CourseEditInput!): Course
-  "Remove a Course"
-  removeCourse(_id: ID!): DeletionMessage
+  "Delete a Course"
+  deleteCourse(_id: ID!): DeletionMessage
   "Create a Student"
   createStudent(input: StudentInput!): Student
   "Edit a Student"
   editStudent(_id: ID!, input: StudentEditInput!): Student
-  "Remove a Student"
-  removeStudent(_id: ID!): DeletionMessage
+  "Delete a Student"
+  deleteStudent(_id: ID!): DeletionMessage
 }

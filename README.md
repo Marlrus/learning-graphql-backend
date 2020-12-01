@@ -505,4 +505,20 @@ En este caso, no tenemos todos los datos del item, por lo cual tenemos que hacer
 
 Probe la mutacion **createStudent** y funciono de entrada y retorno lo que esperabamos. Probando **getStudents** y **getStudent** obtuve los resultados esperados tambien. Probando las mutaciones, habia accidentalmente usado **editOne** en lugar de **updateOne** lo que estaba haciendo que fallara la mutacion porque no existia dentro de mongo.
 
-Reto, mutaciones de delete.
+### Reto, mutaciones de delete
+
+Como reto hay que crear las mutaciones para delete. Como no sabia que debia retornar, cree un tipo **DeletionMessage** para retornar que se borro exitosamente. Para los type Mutation, solo toman es \_id para usar el metodo **deleteOne** de mongo que toma el \_id para borrar. Las mutaciones son mucho mas cortas para borrar:
+
+```javascript
+const deleteStudent = async (_, { _id, input }) => {
+  try {
+    const db = await connectDB();
+    await db.collection('students').deleteOne({ _id: ObjectID(_id) });
+    return { message: 'Student successfully deleted.' };
+  } catch (err) {
+    console.log(`Err on deleteStudent: ${err.message}`);
+  }
+};
+```
+
+Con esto probe las mutaciones **deleteCourse** y **deleteStudent** y funcionaron adecuadamente.

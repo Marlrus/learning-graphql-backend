@@ -510,7 +510,7 @@ Probe la mutacion **createStudent** y funciono de entrada y retorno lo que esper
 Como reto hay que crear las mutaciones para delete. Como no sabia que debia retornar, cree un tipo **DeletionMessage** para retornar que se borro exitosamente. Para los type Mutation, solo toman es \_id para usar el metodo **deleteOne** de mongo que toma el \_id para borrar. Las mutaciones son mucho mas cortas para borrar:
 
 ```javascript
-const deleteStudent = async (_, { _id, input }) => {
+const deleteStudent = async (_, { _id }) => {
   try {
     const db = await connectDB();
     await db.collection('students').deleteOne({ _id: ObjectID(_id) });
@@ -522,3 +522,39 @@ const deleteStudent = async (_, { _id, input }) => {
 ```
 
 Con esto probe las mutaciones **deleteCourse** y **deleteStudent** y funcionaron adecuadamente.
+
+## Nested Types
+
+Vamos a crear relaciones entre nuestros tipos, creando un campo en nuestra coleccion de Course que tenga un array de Student. Para esto creamos una nueva **Mutation**:
+
+```graphql
+"Add Person to Course"
+addPerson(courseID: ID!, personID: ID!): Course
+```
+
+Hacemos nuestro procedimiento estandar, pero hay algo flojo y es que estamos guardando el id pero no podemos retornar los valores de estudiante porque solo tenemos el id. Para eso tocaria hacer una agregacion. Hice una mejora en el codigo del curso que fue crear dos promesas y resolverlas con _await Promise.all()_ lo que hace que se busque el curso y la persona en paralelo. Para insertar el id usamos **\$addToSet** que inserta un ID si no existe, y lo deja asi si ya esta:
+
+```javascript
+const addPerson = async (_, { courseID, personID }) => {
+  try {
+    const db = await connectDB();
+    const findCourse = db
+      .collection('courses')
+      .findOne({ _id: ObjectID(courseID) });
+    const findStudent = db
+      .collection('students')
+      .findOne({ _id: ObjectID(personID) });
+    const [course, student] = await Promise.all([findCourse, findStudent]);
+    if (!course || !student) throw new Error('No course or student found.');
+    await db
+      .collection('courses')
+      .updateOne(
+        { _id: ObjectID(courseID) },
+        { $addToSet: { people: ObjectID(personID) } }
+      );
+    return course;
+  } catch (err) {
+    console.log(`Err on addPerson`);
+  }
+};
+```

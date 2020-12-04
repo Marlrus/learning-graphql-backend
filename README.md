@@ -558,3 +558,38 @@ const addPerson = async (_, { courseID, personID }) => {
   }
 };
 ```
+
+## Resolver de Tipos
+
+Estamos guardando el ID en un Array dentro del curso, pero no hemos cuadrado para recibir la info de el estudiante agregando con el id. La verdad no entiendo mucho que es lo que esta haciendo el profesor, sobre todo porque no tienen sentido los nombres de las cosas. Creamos un archivo **types.js** donde a Course vamos a agregar un mini resolver para _people_. Este resolver va a recibir el array de ids que tenemos dentro de people. Cambie un poco la condiciones, si no hay people, o recibimos un arr de largo 0 voy a retornar un array vacio de una vez. Prefiero hacerlo asi, porque no hay punto en conectarse en la base de datos si no hay datos para buscar.
+
+Si hay datos nos conectamos a la db, convertimos los ids en _ObjectID_ y usamos eso para encontrar las personas y las volvemos a un array. Cuando tenemos eso, retornamos esa respuesta:
+
+```javascript
+const peopleResolver = async ({ people }) => {
+  try {
+    if (!people || people.length === 0) return [];
+    const db = await connectDB();
+    const ids = people.map(id => ObjectID(id));
+    const peopleData = await db
+      .collection('people')
+      .find({ _id: { $in: ids } })
+      .toArray();
+    return peopleData;
+  } catch (err) {
+    console.log(`Err in people types: ${err.message}`);
+  }
+};
+
+const Course = {
+  people: peopleResolver,
+};
+
+const types = {
+  Course: CourseTypes,
+};
+
+module.exports = types;
+```
+
+### Agregar types a Resolver

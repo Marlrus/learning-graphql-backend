@@ -593,3 +593,44 @@ module.exports = types;
 ```
 
 ### Agregar types a Resolver
+
+Teniendo los types exportados, lo que tenemos que hacer es meterlos en el resolver, lo cual hacemos importando **types** y haciendo un spread dentro de nuestro Resolver:
+
+```javascript
+const types = require('./types');
+
+const Resolver = {
+  Query: queries,
+  Mutation: mutations,
+  ...types,
+};
+```
+
+## Errores
+
+Cuando hay un error en una de nuestras APIs de GraphQL, recebimos un objeto de **errors** en la respuesta. Hay detalles del error, y nos sale el **path** del error tambien. En el caso de que tengamos un valor obligatorio en el Resolver que no concuerda con lo que hay en nuestro **schema**, el codigo va a fallar sin ejecutar codigo del resolver. Si hay un error dentro de el resolver, este error se va a enviar a nuestro API dentro del mismo prop de **errors**.
+
+### Errores Personalizados
+
+Uno no quiere siempre darle acceso a los errores a nuestro usuario final, por lo cual vamos a enviar un error generalizado creado por nosotros. Creamos un nuevo archivo **lib/errorHandler.js**. Cree un errorHandler un poco distinto al del curso para tener mas claridad en nuestros logs de la ubicacion del error:
+
+```javascript
+const errorHandler = (err, optionalName) => {
+  const optionalMessage = `Error in ${optionalName}: ${err}`;
+  const errMessage = optionalName ? optionalMessage : err;
+  console.log(errMessage);
+  throw new Error('Error in server operation.');
+};
+
+module.exports = errorHandler;
+```
+
+Para usarlo en nuestros queries y mutation lo agregamos a nuestro **catch**:
+
+```javascript
+  try {
+    ...
+  } catch (err) {
+    errorHandler(err, 'getCourses');
+  }
+```

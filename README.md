@@ -634,3 +634,126 @@ Para usarlo en nuestros queries y mutation lo agregamos a nuestro **catch**:
     errorHandler(err, 'getCourses');
   }
 ```
+
+## Alias y Fragments
+
+Esta parte se enfoca en hacer multiples consultas al tiempo usando **Aliases**. Esta parte no requiere que hagamos nada en el backend, lo unico que tenemos que hacer es darle un nombre a cada query que hacemos:
+
+```graphql
+{
+  allCourses: getCourses {
+    title
+    description
+    topic
+    _id
+  }
+
+  course1: getCourse(id: "5fb3d1a05dc3290c92a159ef") {
+    title
+    description
+    topic
+  }
+}
+```
+
+Esto nos va a traer una consulta con ambos datos dentro de **data** como **data.allCourses** y **data.course1**.
+
+### Fragments
+
+Fragments nos permiten reemplazar campos que vamos a pedir iguales en varias consultas, en el caso de nuestra consulta serian title, description, y topic. Para definir el fragmento, hay que declarar en que tipo es:
+
+```graphql
+fragment CourseFields on Course {
+  title
+  description
+  topic
+}
+```
+
+Que podemos usar en nuestra consulta:
+
+```graphql
+{
+  allCourses: getCourses {
+    ...CourseFields
+    _id
+  }
+
+  course1: getCourse(id: "5fb3d1a05dc3290c92a159ef") {
+    ...CourseFields
+  }
+}
+
+fragment CourseFields on Course {
+  title
+  description
+  topic
+}
+```
+
+De esta forma recivimos los fields de nuestro fragment en las consultas. A este, podemos agregar **type** tambien, como traer people:
+
+```graphql
+{
+  allCourses: getCourses {
+    ...CourseFields
+    _id
+  }
+
+  course1: getCourse(id: "5fb3d1a05dc3290c92a159ef") {
+    ...CourseFields
+  }
+}
+
+fragment CourseFields on Course {
+  title
+  description
+  topic
+  people {
+    name
+  }
+}
+```
+
+Trate de hacer los fragments en el schema pero no me lo permitio, parece que estos deben hacerse en el query.
+
+## Variables
+
+Cuando hay que hacer mutations, uno debe enviar variables. Este proceso es un poco mas molesto y lo vamos a hacer dentro de GraphiQL. Primero tenemos que definir una mutacion nueva con los nombres de las variables que estamos pensando pasar:
+
+```graphql
+mutation AddPersonToCourse ($course:ID!, $person: ID!){ ... }
+```
+
+Las variables llevan el simbolo **\$** antes. Luego abrimos braquets y usamos la mutacion que ya tenemos, en el caso de nosotros va a ser **addPerson**. Adentro vamos a usar esas variables:
+
+```graphql
+addPerson(courseID: $course, personID: $person){ ... }
+```
+
+Recibimos las variables arriba, y las pasamos a nuestra mutacion por dentro. Para pasar las variables, tenemos que abrir el tab **Query Variables** en nuestro GraphiQL y pasarlas como un objeto JSON:
+
+```json
+{
+  "course": "5fb3d2035dc3290c92a159f0",
+  "person": "5fc64815099f9c1415acbc32"
+}
+```
+
+Al correr nuestra mutacion, va a tomar los valores de esas variables y va a crear la persona dentro de nuestra coleccion:
+
+```graphql
+mutation AddPersonToCourse($course: ID!, $person: ID!) {
+  addPerson(courseID: $course, personID: $person) {
+    _id
+    title
+    people {
+      name
+      email
+      _id
+    }
+  }
+}
+```
+
+El uso de variables funciona para ambas _mutaciones_ y _queries_ usando el mismo proceso.

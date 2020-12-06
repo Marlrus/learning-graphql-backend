@@ -757,3 +757,36 @@ mutation AddPersonToCourse($course: ID!, $person: ID!) {
 ```
 
 El uso de variables funciona para ambas _mutaciones_ y _queries_ usando el mismo proceso.
+
+## Enums
+
+GraphQL soporta Enums como en TS:
+
+```graphql
+"Validates level types"
+enum Level {
+  beginner
+  intemediate
+  advanced
+}
+
+type Course {
+  _id: ID!
+  title: String!
+  teacher: String
+  description: String!
+  topic: String
+  people: [Student]
+  level: Level
+}
+
+input CourseInput {
+  title: String!
+  teacher: String
+  description: String!
+  topic: String
+  level: Level
+}
+```
+
+Se lo agregamos al curso y creamos un curso nueva con nuestra mutacion de creacion de cursos. Tenemos que recordar colocarlo un nuestras mutaciones tambien. En GraphiQL creamos una mutacion en la que vamos a crear el curso usando el JSON de variables, y vemos que nos autocompleta los resultados de acuerdo a nuestro schema. En el caso de la variable **level** nos autocompleta con _los valores permitidos_: beginner, intermediate, advanced.

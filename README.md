@@ -789,4 +789,123 @@ input CourseInput {
 }
 ```
 
-Se lo agregamos al curso y creamos un curso nueva con nuestra mutacion de creacion de cursos. Tenemos que recordar colocarlo un nuestras mutaciones tambien. En GraphiQL creamos una mutacion en la que vamos a crear el curso usando el JSON de variables, y vemos que nos autocompleta los resultados de acuerdo a nuestro schema. En el caso de la variable **level** nos autocompleta con _los valores permitidos_: beginner, intermediate, advanced.
+Se lo agregamos al curso y creamos un curso nueva con nuestra mutacion de creacion de cursos. Tenemos que recordar colocarlo un nuestras mutaciones tambien. En GraphiQL creamos una mutacion en la que vamos a crear el curso usando el JSON de variables, y vemos que nos autocompleta los resultados de acuerdo a nuestro schema. En el caso de la variable **level** nos autocompleta con _los valores permitidos_: beginner, intermediate, advanced. Si pasamos un valor equivocado, graphql retorna un error que dice que enviamos un valor invalido al enum:
+
+```graphql
+mutation CreateNewCourse($CourseInput: CourseInput!) {
+  createCourse(input: $CourseInput) {
+    _id
+    title
+    teacher
+    description
+    topic
+    people {
+      name
+      email
+    }
+  }
+}
+```
+
+```json
+{
+  "CourseInput": {
+    "title": "Marmot Cooking",
+    "teacher": "MarmotET",
+    "description": "Cooking tecniques from Marmot.",
+    "topic": "Cooking",
+    "level": "beginner"
+  }
+}
+```
+
+Al correr esto, creamos nuestro curso usando el enum.
+
+## Interfaces
+
+Comenzamos cambiando nuestro schema para que soporte diferentes tipos de personas: Students, y Montiors. Creamos una interface que contiene los valores en comun entre ambos tipos y usamos **implements** para que se utilicen en ambos casos:
+
+```graphql
+interface Person {
+  _id: ID!
+  name: String!
+  email: String!
+}
+
+type Student implements Person {
+  _id: ID!
+  name: String!
+  email: String!
+  avatar: String
+}
+
+type Monitor implements Person {
+  _id: ID!
+  name: String!
+  email: String!
+  phone: String
+}
+```
+
+Al hacer este cambio, tenemos que alterar todos nuestros inputs, queries, y mutaciones para que utilicen este nuevo schema. Cambiamos a PersonInput, PersonEditInput (donde colocamos los nuevos campos opcionales para cada subtipo), y todos nuestros get, create, edit, delete a usar _person_ en vez de la palabra student. Es **obligatorio repetir los campos de la interfaz en el tipo para que graphql no envie errores** ya que realmente no esta extendiendo nada. Esto es simplemente otra validacion que hacemos.
+
+### Resolvers para estas modificaciones
+
+Tenemos que cambiar todos nuestros queries y mutaciones a que utilicen el nuevo nombre para que nuestro schema coincida. La parte mas compleja es como vamos a resolver si una persona es un monitor o estudiante. Para esto vamos **types.js**. Es esta parte vamos a crear dentro de nuestros types la propiedad **Person** que va a resolver este conflicto. Para esto usamos una propiedad **\_\_resolveType** que toma una funcion con 3 args: person, context, info. Solo vamos a usar la primera para validar, si tiene la prop **phone** es Monitor, si no, es estudiante. Terminamos con lo siguiente:
+
+```javascript
+const PersonResolver = (person, context, info) =>
+  person.phone ? 'Monitor' : 'Student';
+
+const PersonTypes = {
+  __resolveType: PersonResolver,
+};
+
+const types = {
+  Course: CourseTypes,
+  Person: PersonTypes,
+};
+```
+
+Teniendo esto podemos resolver a las personas de nuestro array como monitores o estudiantes. Vamos a graphql y creamos una mutacion para crear un monitor. En esta tengo un problema y es que graphql no esta autocompletando los fields de acuerdo a mi schema y me toco ingresarlos manualmente. A la vez, a pesar de que vamos a crear un monitor, no podemos query phone porque puede ser nulo el valor:
+
+```graphql
+mutation CreateNewMonitor($monitorInput: PersonInput!) {
+  createPerson(input: $monitorInput) {
+    _id
+    name
+    email
+  }
+}
+```
+
+```json
+{
+  "monitorInput": {
+    "name": "Otterton Monitor",
+    "email": "otterton@creaturemail.com",
+    "phone": "123123123"
+  }
+}
+```
+
+Para probar, vamos a hacer un query e incluir la notacion de fragment para traer el phone en caso de que la persona sea un monitor:
+
+```graphql
+{
+  getPeople {
+    _id
+    name
+    email
+    ... on Monitor {
+      phone
+    }
+  }
+}
+```
+
+Esto mismo se podria hacer con Student en el avatar, pero por el momento no tenemos un estudiante con avatar.
+
+### Error en Documentacion Generada
+
+No se porque, pero ahora no se me esta autocompletando el scema en graphQL cuando voy a hacer una peticion. Funciona pero no me muestra los campos que tengo disponibles en le query.

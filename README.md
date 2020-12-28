@@ -909,3 +909,182 @@ Esto mismo se podria hacer con Student en el avatar, pero por el momento no tene
 ### Error en Documentacion Generada
 
 No se porque, pero ahora no se me esta autocompletando el scema en graphQL cuando voy a hacer una peticion. Funciona pero no me muestra los campos que tengo disponibles en le query.
+
+## Directivas
+
+Una directiva es una instruccion que nos permite agregar condiciones a los queries. Los dos que vemos es **include** y **skip**, include incluye un resultado si la condicion es true, skip la evita si es true. Vamos a usarlo en un nuevo query para nuestro servidor.
+
+```graphql
+query getPeopleData($monitor: Boolean!) {
+  getPeople {
+    _id
+    name
+    email
+    ... on Monitor @include(if: $monitor) {
+      phone
+    }
+  }
+}
+```
+
+Con la variable
+
+```json
+{
+  "monitor": true
+}
+```
+
+En este caso, encontramos todas las personas, y si hay un monitor, nos retorna el telefono. Si no lo hay, retorna sin el telefono. Si tuvieramos _false_, no recivimos el telefono asi exista un monitor.
+
+### Deprecated
+
+En nuestro schema podemos agregar a un campo la directiva **@deprecated** que va a informar a nuestro usuario que ese campo no se va a poder pedir en el futuro:
+
+```graphql
+type Course {
+  _id: ID!
+  title: String!
+  teacher: String
+  description: String!
+  topic: String @deprecated
+  people: [Person]
+  level: Level
+}
+```
+
+Al colocar esto, en nuestro playground podemos ver una alerta que dice: _The field Course.topic is deprecated. No longer supported._
+
+## Unions
+
+Unions nos permite hacer lo que hacen las interfaces pero de una forma mas extrema. Es muy similar a lo que se hace en TypeScript. Creamos una union nueva:
+
+```graphql
+union GlobalSearch = Course | Student | Monitor
+
+type Query {
+  ...
+  "Execute a global search"
+  searchItems(keyword: String!): [GlobalSearch]
+}
+```
+
+En nuestros types creamos un resolver con \_\_resolveType:
+
+```javascript
+const globalSearchResolver = (item, context, info) => {
+  if (item.title) return 'Course';
+  if (item.phone) return 'Monitor';
+  return 'Student';
+};
+
+const GlobalSearchTypes = {
+  __resolveType: globalSearchResolver,
+};
+
+const types = {
+  Course: CourseTypes,
+  Person: PersonTypes,
+  GlobalSearch: GlobalSearchTypes,
+};
+```
+
+### Index y text search con mongo Atlas (ERROR MIO)
+
+**Note:** Mongo db Atlas ofrece una forma de crear search indexes, desafortunadamente _solo son para el uso dentro de atlas_. Quiere decir que solo podemos correr queries dentro de nuestro servicio. Intente de varias formas pero usando **aggregate** con el operador **\$search** es invalido en mongo. Para lograr que funcionara me toco conectarme usando es mongo shell desde mi terminal, conectado con el servidor.
+
+Para conectarse al servidor hay que:
+
+1. Instalar es mongo shell en el sistema.
+2. Ir a la base de datos en atlas y abrir **connect**.
+3. En la p2 copiar el connect string: mongo "mongodb+srv://cluster0.munj1.mongodb.net/\<dbname\>" --username \<username\>
+4. Ingresar la clave de la base de datos.
+
+Cuando se cumplen estos pasos se pueden correr comandos del mongo shell que nos permiten crear el indice que se usa en el text search de el curso.
+
+### Continuacion
+
+Tenemos que crear el indice para habilitar el text search. Primero corro **show dbs** en el terminal para ver que dbs tengo acceso en nuestro shell. Despues voy a la base de datos **use dbName** para entrar. Adentro puedo usar **show collections** para ver que collecciones tengo y verificar que los pasos que voy a correr van a funcionar. Para crear el indice corro:
+
+```mongo
+db.students.createIndex({"$**": "text"})
+```
+
+Corremos este mismo comando para courses. Con cada comando tenemos una respuesta. Teniendo esto podemos usar el mismo query que utilizan en el curso para hacer text search que se puede utilizar desde graphQL y no solo desde nuestro atlas.
+
+### Query en el resolver
+
+Ya tenemos el indice con el nombre _text_ para utilizar para nuestro query:
+
+```javascript
+const courses = await db
+  .collection('courses')
+  .find({ $text: { $search: keyword } })
+  .toArray();
+const people = await db
+  .collection('students')
+  .find({ $text: { $search: keyword } })
+  .toArray();
+```
+
+## Text search nuevo
+
+Cai en cuenta de que mi query no funcionaba porque estaba llamando mal las collecciones usando _Courses_ en vez de **courses** y lo mismo con student. Al caer en cuenta de esto, intente usar el query con el index que cree en el shell y funciono. Reverti los cambios borrando los indices nuevos y corriendo **aggregate** para usar los search indexes creados en atlas y funciono. Siendo esta la nueva forma de hacer text search, reverti todo. Al final mi resolver quedo asi:
+
+```javascript
+const searchItems = async (root, { keyword }) => {
+  try {
+    const db = await connectDB();
+    const courses = await db
+      .collection('courses')
+      .aggregate([
+        {
+          $search: {
+            index: 'default',
+            text: {
+              query: keyword,
+              path: { wildcard: '*' },
+            },
+          },
+        },
+      ])
+      .toArray();
+    const people = await db
+      .collection('students')
+      .aggregate([
+        {
+          $search: {
+            index: 'default',
+            text: {
+              query: keyword,
+              path: { wildcard: '*' },
+            },
+          },
+        },
+      ])
+      .toArray();
+    const items = [...courses, ...people];
+    return items;
+  } catch (err) {
+    errorHandler(err, 'searchItems');
+  }
+};
+```
+
+Al correr un query en graphql funciona como esperaba:
+
+```graphql
+{
+  searchItems(keyword: "spleen") {
+    ... on Person {
+      name
+    }
+    ... on Monitor {
+      name
+    }
+    ... on Course {
+      title
+    }
+  }
+}
+```

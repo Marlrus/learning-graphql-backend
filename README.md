@@ -989,9 +989,7 @@ const types = {
 };
 ```
 
-### Index y text search con mongo Atlas (ERROR MIO)
-
-**Note:** Mongo db Atlas ofrece una forma de crear search indexes, desafortunadamente _solo son para el uso dentro de atlas_. Quiere decir que solo podemos correr queries dentro de nuestro servicio. Intente de varias formas pero usando **aggregate** con el operador **\$search** es invalido en mongo. Para lograr que funcionara me toco conectarme usando es mongo shell desde mi terminal, conectado con el servidor.
+### Index y text search con mongo Atlas usando Shell
 
 Para conectarse al servidor hay que:
 
@@ -1001,8 +999,6 @@ Para conectarse al servidor hay que:
 4. Ingresar la clave de la base de datos.
 
 Cuando se cumplen estos pasos se pueden correr comandos del mongo shell que nos permiten crear el indice que se usa en el text search de el curso.
-
-### Continuacion
 
 Tenemos que crear el indice para habilitar el text search. Primero corro **show dbs** en el terminal para ver que dbs tengo acceso en nuestro shell. Despues voy a la base de datos **use dbName** para entrar. Adentro puedo usar **show collections** para ver que collecciones tengo y verificar que los pasos que voy a correr van a funcionar. Para crear el indice corro:
 
@@ -1027,9 +1023,18 @@ const people = await db
   .toArray();
 ```
 
-## Text search nuevo
+## Text search MongoDB Atlas Nuevo
 
-Cai en cuenta de que mi query no funcionaba porque estaba llamando mal las collecciones usando _Courses_ en vez de **courses** y lo mismo con student. Al caer en cuenta de esto, intente usar el query con el index que cree en el shell y funciono. Reverti los cambios borrando los indices nuevos y corriendo **aggregate** para usar los search indexes creados en atlas y funciono. Siendo esta la nueva forma de hacer text search, reverti todo. Al final mi resolver quedo asi:
+Mongo DB Atlas tiene una opcion de crear search indexes que tienen varias opciones y optimizaciones que se pueden ver en los [DOCS](https://docs.atlas.mongodb.com/reference/atlas-search/path-construction#wildcard-field-search). El proceso es sencillo:
+
+1. En MongoDB Atlas ir al cluster
+2. Entrar a la colleccion en la que se va a crear el index
+3. Ir al tab de search indexes
+4. Click en CREATE INDEX el default es el wildcard field search pero hay muchas opciones en los DOCS
+5. Click en Create Index dentro de este menu.
+6. Utilizar el query para el text search usando aggergate con el nombre del index en el field index.
+
+Cai en cuenta de que mi query no funcionaba porque estaba llamando mal las collecciones usando _Courses_ en vez de **courses** y lo mismo con student. Al caer en cuenta de esto, intente usar el query sin el index que cree en el shell y funciono. Reverti los cambios borrando los indices nuevos y corriendo **aggregate** para usar los search indexes creados en atlas y funciono. Siendo esta la nueva forma de hacer text search, reverti todo. Al final mi resolver quedo asi:
 
 ```javascript
 const searchItems = async (root, { keyword }) => {
@@ -1088,3 +1093,54 @@ Al correr un query en graphql funciona como esperaba:
   }
 }
 ```
+
+## Preparando la API para produccion
+
+Para habilitar la API para uso externo tenemos que instalar CORS. En nuestro **index.js** requerimos cors y lo utilizamos antes de nuestras rutas con `app.use(cors())`. Este toma un objeto de configuracion, pero vamos a dejarlo con el default. Uno podria tener un whitelist entre otras opciones para CORS.
+
+### Deshabilitar GraphiQL en Prod
+
+Queremos tener GraphiQL habilitado en desarrollo pero no en produccion, lo que logramos usando **process.env.NODE_ENV**. Creamos una constante que sea un boolean para cualquier ambiente que no es produccion, el cual usamos en la configuracion de nuestra ruta de graphql:
+
+```javascript
+const devEnv = process.env.NODE_ENV !== 'production';
+
+app.use(
+  '/graphql',
+  graphqlHTTP({
+    schema,
+    rootValue: resolvers,
+    graphiql: devEnv,
+  })
+);
+```
+
+Esto hace que sea true cuando no estamos en produccion y que se esconda cuando lanzemos el API a produccion.
+
+### Script para produccion
+
+En nuestro package vamos a crear un script para correr nuestro api en produccion con el comando **start**.
+
+```JSON
+"scripts": {
+    "start": "NODE_ENV=production node index",
+    "dev": "nodemon -e js,graphql index",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "lint": "standard",
+    "lint:fix": "standard --fix"
+  },
+```
+
+Para probar, corremos el script de produccion, e intentamos entrar a graphiql. Donde recibimos el mensaje: _{"errors":[{"message":"Must provide query string."}]}_. Si enviamos nuestro query como un query string recivimos los datos pero no tenemos habilitado nuestro playground.
+
+## HTTP Requests
+
+Vamos a acceder nuestro API en produccion usando Postman. Podemos copiar un URL string y hacer la peticion desde la terminal usado curl tambien:
+
+```bash
+curl urlString | jq
+```
+
+Esto va a hacer la peticion con el query string y jq nos parsea el output para que sea mas legible. Esa es la forma mas cruda de hacerlo, sin embargo con la herramienta de postman podemos enviar un request mas legible. Colocamos nuestro URL y vamos a Body. Ahi tenemos una opcion **GraphQL** que nos permite enviar un query y variables de la misma forma a si estuvieramos usando el playground.
+
+## Clientes de GraphQL

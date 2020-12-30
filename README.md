@@ -1,6 +1,6 @@
-# GraphQL Platzi
+# Servidor GraphQL
 
-Curso de GraphQL en Platzi dirigido por Adrian Estrada.
+API de GraphQL basado en el curso dirigido por Adrian Estrada.
 
 ## Montaje Inicial
 
@@ -1143,4 +1143,10 @@ curl urlString | jq
 
 Esto va a hacer la peticion con el query string y jq nos parsea el output para que sea mas legible. Esa es la forma mas cruda de hacerlo, sin embargo con la herramienta de postman podemos enviar un request mas legible. Colocamos nuestro URL y vamos a Body. Ahi tenemos una opcion **GraphQL** que nos permite enviar un query y variables de la misma forma a si estuvieramos usando el playground.
 
-## Clientes de GraphQL
+### Clientes de GraphQL
+
+Hay varias formas de hacer queries a GraphQL usando clientes tales como Apollo. Estos clientes tienen formatos ligeramente distintos cada uno y algunos como apollo nos brindan funcionalidad adicional como es el cache a nuestros queries. El cliente es negociable.
+
+## Consumir el API desde el Frontend
+
+En esta parte del curso se crea un micro-front end con handlebars. Es una forma diferente de consumir graphql a lo que estoy acostumbrado. Es mas complejo que consumir graphQL desde React. En resumen el proceso es hacer el query e inyectarle los valores a nuestro template. Todo se hace con graphql-request.
